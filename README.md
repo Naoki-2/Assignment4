@@ -1,5 +1,13 @@
-# Assignment #2 Repository
+# Assignment 2 Analysis
 
-This repository includes the simulated data for Assignment #2. Fork this repository and add your analysis as described in the canvas assignment.
+I analyzed the cohort simulated data.
 
-The csv file for `cohort` in the `raw-data` folder includes 5,000 observations with variables `smoke`, `female`, `age`, `cardiac`, and `cost`.
+Summary statistics were created for the variables smoke, female, age, cardiac, and cost.
+
+A logistic regression model was used to predict smoking status using female, age, cardiac, and cost.
+
+The age distribution was visualized with a histogram.
+
+In this simulated cohort, smoking appears to be associated with some participant characteristics.
+
+I attest that I did not use generative AI technology (e.g., ChatGPT) to complete any portion of this work.

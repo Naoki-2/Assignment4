@@ -1,0 +1,304 @@
+---
+title: "Reproducible Analysis of Cohort Simulated Data"
+author: "Naoki Hiratsuka"
+format: html
+editor: visual
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+------------------------------------------------------------------------
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(broom)
+```
+
+```{r}
+cohort_data <- read_csv("raw-data/cohort.csv", show_col_types = FALSE)
+
+expected_vars <- c("smoke", "female", "age", "cardiac", "cost")
+stopifnot(all(expected_vars %in% names(cohort_data)))
+
+analysis_data <- cohort_data |>
+  mutate(
+    smoke = as.integer(smoke),
+    female = as.integer(female),
+    cardiac = as.integer(cardiac),
+    smoke_label = factor(
+      smoke,
+      levels = c(0, 1),
+      labels = c("Non-smoker", "Smoker")
+    ),
+    female_label = factor(
+      female,
+      levels = c(0, 1),
+      labels = c("Male", "Female")
+    ),
+    cardiac_label = factor(
+      cardiac,
+      levels = c(0, 1),
+      labels = c("No cardiac event", "Cardiac event")
+    )
+  )
+```
+
+# Introduction
+
+This report analyzes cohort simulated data from Assignment 2. The dataset contains individual-level information on smoking status, sex, age, cardiac events, and health care costs. The goal of this report is to summarize the cohort and examine whether smoking, sex, and age are associated with cardiac events and health care costs in the simulated data.
+
+The report also demonstrates a reproducible workflow using Quarto, R, and GitHub. In a reproducible document, the prose, code, tables, and figures are kept together. This makes the analysis easier to update, check, and reproduce.
+
+# Methods
+
+## Data
+
+The analysis used the cohort simulated data stored in the `raw-data` folder of this GitHub repository. The dataset contains `r nrow(analysis_data)` observations and `r ncol(cohort_data)` original variables.
+
+The original variables are:
+
+```{r}
+tibble(
+  variable_name = names(cohort_data),
+  description = c(
+    "Indicator for smoking status; 1 indicates smoker and 0 indicates non-smoker",
+    "Indicator for sex; 1 indicates female and 0 indicates male",
+    "Age in years",
+    "Indicator for cardiac event; 1 indicates a cardiac event and 0 indicates no cardiac event",
+    "Simulated health care cost"
+  )
+) |>
+  kable(caption = "Variables in the cohort simulated data")
+```
+
+## Notation
+
+Let i = 1, ..., n index individuals in the simulated cohort. Let Y_i denote the binary cardiac event outcome for individual i, where Y_i = 1 indicates that a cardiac event occurred and Y_i = 0 indicates that no cardiac event occurred.
+
+Let S_i denote smoking status, where S_i = 1 for smokers and S_i = 0 for non-smokers. Let F_i denote sex, where F_i = 1 indicates female and F_i = 0 indicates male. Let A_i denote age in years. Let C_i denote health care cost.
+
+For the binary cardiac outcome, I estimated the following logistic regression model:
+
+logit[P(Y_i = 1 | S_i, F_i, A_i)] = beta_0 + beta_1 S_i + beta_2 F_i + beta_3 A_i
+
+For health care cost, I estimated the following linear regression model:
+
+C_i = alpha_0 + alpha_1 S_i + alpha_2 F_i + alpha_3 A_i + alpha_4 Y_i + epsilon_i
+
+In these models, the coefficients describe associations in the simulated data. They should not be interpreted as causal effects.
+
+## Statistical Analysis
+
+First, I summarized the overall cohort and compared key characteristics by cardiac event status. Second, I created two figures: one showing cardiac event rates by smoking status, and one showing the distribution of health care costs by cardiac event status. Third, I estimated a logistic regression model for cardiac events and a linear regression model for health care costs.
+
+Because these data are simulated, the analysis is intended as an exercise in reproducible statistical reporting rather than evidence about a real population.
+
+# Results
+
+## Data Summary
+
+The analytic dataset included `r nrow(analysis_data)` individuals. Overall, `r round(mean(analysis_data$smoke) * 100, 1)`% were smokers, `r round(mean(analysis_data$female) * 100, 1)`% were female, the mean age was `r round(mean(analysis_data$age), 1)` years, and `r round(mean(analysis_data$cardiac) * 100, 1)`% experienced a cardiac event. The mean health care cost was `r round(mean(analysis_data$cost), 1)`.
+
+Table 1 summarizes the cohort by cardiac event status.
+
+```{r}
+summary_by_cardiac <- analysis_data |>
+  group_by(cardiac_label) |>
+  summarise(
+    n = n(),
+    mean_age = mean(age),
+    sd_age = sd(age),
+    smoking_percent = mean(smoke) * 100,
+    female_percent = mean(female) * 100,
+    mean_cost = mean(cost),
+    sd_cost = sd(cost),
+    .groups = "drop"
+  )
+
+summary_by_cardiac |>
+  kable(
+    digits = 2,
+    caption = "Cohort characteristics by cardiac event status"
+  )
+```
+
+Individuals with a cardiac event had a higher smoking prevalence and higher mean health care costs than individuals without a cardiac event. The mean age was also slightly higher among individuals with a cardiac event.
+
+## Cardiac Events by Smoking Status
+
+Figure 1 shows the cardiac event rate by smoking status.
+
+```{r}
+cardiac_by_smoke <- analysis_data |>
+  group_by(smoke_label) |>
+  summarise(
+    n = n(),
+    cardiac_events = sum(cardiac),
+    cardiac_event_rate = mean(cardiac),
+    .groups = "drop"
+  )
+
+cardiac_by_smoke |>
+  kable(
+    digits = 3,
+    caption = "Cardiac event rate by smoking status"
+  )
+```
+
+```{r}
+ggplot(cardiac_by_smoke, aes(x = smoke_label, y = cardiac_event_rate)) +
+  geom_col() +
+  scale_y_continuous(
+    labels = function(x) paste0(round(x * 100), "%")
+  ) +
+  labs(
+    title = "Cardiac Event Rate by Smoking Status",
+    x = "Smoking status",
+    y = "Cardiac event rate"
+  )
+```
+
+The cardiac event rate was higher among smokers than among non-smokers in this simulated cohort.
+
+## Health Care Costs by Cardiac Event Status
+
+Figure 2 shows the distribution of health care costs by cardiac event status.
+
+```{r}
+ggplot(analysis_data, aes(x = cardiac_label, y = cost)) +
+  geom_boxplot() +
+  labs(
+    title = "Health Care Costs by Cardiac Event Status",
+    x = "Cardiac event status",
+    y = "Health care cost"
+  )
+```
+
+Health care costs were higher among individuals with cardiac events than among individuals without cardiac events.
+
+## Logistic Regression for Cardiac Events
+
+Table 3 shows the logistic regression model for cardiac events. The model included smoking status, sex, and age as predictors.
+
+```{r}
+cardiac_model <- glm(
+  cardiac ~ smoke + female + age,
+  data = analysis_data,
+  family = binomial()
+)
+
+cardiac_model_results <- tidy(
+  cardiac_model,
+  exponentiate = TRUE,
+  conf.int = TRUE
+) |>
+  mutate(
+    term = recode(
+      term,
+      "(Intercept)" = "Intercept",
+      "smoke" = "Smoker",
+      "female" = "Female",
+      "age" = "Age"
+    )
+  ) |>
+  select(
+    term,
+    odds_ratio = estimate,
+    conf.low,
+    conf.high,
+    p.value
+  )
+
+cardiac_model_results |>
+  kable(
+    digits = 3,
+    caption = "Logistic regression model for cardiac events"
+  )
+```
+
+In this simulated dataset, smoking was strongly associated with higher odds of a cardiac event after adjustment for sex and age. Female sex was associated with lower odds of a cardiac event, and age was weakly associated with higher odds of a cardiac event.
+
+## Linear Regression for Health Care Costs
+
+Table 4 shows the linear regression model for health care costs. The model included smoking status, sex, age, and cardiac event status as predictors.
+
+```{r}
+cost_model <- lm(
+  cost ~ smoke + female + age + cardiac,
+  data = analysis_data
+)
+
+cost_model_results <- tidy(
+  cost_model,
+  conf.int = TRUE
+) |>
+  mutate(
+    term = recode(
+      term,
+      "(Intercept)" = "Intercept",
+      "smoke" = "Smoker",
+      "female" = "Female",
+      "age" = "Age",
+      "cardiac" = "Cardiac event"
+    )
+  ) |>
+  select(
+    term,
+    estimate,
+    conf.low,
+    conf.high,
+    p.value
+  )
+
+cost_model_results |>
+  kable(
+    digits = 2,
+    caption = "Linear regression model for health care costs"
+  )
+```
+
+```{r}
+cost_model_fit <- glance(cost_model)
+
+tibble(
+  r_squared = cost_model_fit$r.squared,
+  adjusted_r_squared = cost_model_fit$adj.r.squared
+) |>
+  kable(
+    digits = 3,
+    caption = "Model fit for the health care cost model"
+  )
+```
+
+In this simulated dataset, health care costs were higher among smokers, older individuals, and individuals with cardiac events. Female sex was associated with lower health care costs. The linear model explained a substantial share of the variation in simulated costs.
+
+# Discussion
+
+This report analyzed cohort simulated data using a reproducible Quarto workflow. The analysis found that cardiac events were more common among smokers than non-smokers. In the adjusted logistic regression model, smoking was strongly associated with higher odds of cardiac events. Age was also positively associated with cardiac events, although the association was smaller. Female sex was associated with lower odds of cardiac events in this simulated dataset.
+
+The analysis also found that health care costs were higher among individuals with cardiac events. In the linear regression model, smoking, age, and cardiac event status were positively associated with health care costs, while female sex was negatively associated with costs. These findings are internally consistent with the descriptive results, where individuals with cardiac events had higher smoking prevalence and higher average costs.
+
+The main limitation is that the data are simulated. Therefore, the results should not be interpreted as evidence about a real clinical or policy population. In addition, the models estimate associations rather than causal effects. For example, the coefficient for smoking in the cardiac event model should not be interpreted as the causal effect of smoking on cardiac events. A causal interpretation would require stronger assumptions and a research design that addresses confounding.
+
+The main purpose of this report is to demonstrate a reproducible analytic workflow. The data, code, tables, figures, and prose are contained in a single Quarto document, and the report can be rendered again if the data or code are updated.
+
+# AI Use Statement
+
+I attest that I did not use generative AI technology (e.g., ChatGPT) to complete any portion of this work.
+
+# Session Information
+
+The following information documents the R environment used to render this report.
+
+<details>
+
+<summary>Click to show session information</summary>
+
+```{r}
+sessionInfo()
+```
+
+</details>
